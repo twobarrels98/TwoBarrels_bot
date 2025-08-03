@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: two-barrels
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: BOT_TOKEN
+        value: 8423027556:AAF1wOj6SL0AZwUBFQRip4mXEcuiV-AF4nY
+      - key: WEBHOOK_URL
+        value: https://two-barrels.onrender.com
