@@ -1,37 +1,52 @@
-import asyncio
-import logging
 import os
-from aiogram import Bot, Dispatcher
+import logging
+from aiohttp import web
+from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.types import Update
-from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
-from aiohttp import web
 from dotenv import load_dotenv
-from handlers import router
 
+# Загружаем переменные окружения из .env
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_PATH = "/webhook"
-WEBHOOK_URL = os.getenv("WEBHOOK_URL") + WEBHOOK_PATH
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
+# Настройка логгера
+logging.basicConfig(level=logging.INFO)
+
+# Инициализация бота и диспетчера
 bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
-dp = Dispatcher(storage=MemoryStorage())
-dp.include_router(router)
+dp = Dispatcher()
 
-async def on_startup(bot: Bot) -> None:
-    await bot.set_webhook(WEBHOOK_URL)
+# Обработка команды /начнем
+@dp.message(commands=["начнем"])
+async def cmd_start(message: types.Message):
+    await message.answer("Привет! Я готов принять твой заказ на шаурму 🌯")
 
-async def on_shutdown(bot: Bot) -> None:
-    await bot.delete_webhook()
+# Webhook обработчик
+async def telegram_webhook(request: web.Request):
+    try:
+        data = await request.json()
+        update = Update.model_validate(data)
+        await dp.feed_update(bot, update)
+    except Exception as e:
+        logging.error(f"Ошибка при обработке запроса: {e}")
+    return web.Response(text="OK")
 
-async def main():
-    logging.basicConfig(level=logging.INFO)
-    app = web.Application()
-    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
-    setup_application(app, dp, bot=bot, on_startup=on_startup, on_shutdown=on_shutdown)
-    return app
+# Создаём приложение AIOHTTP
+app = web.Application()
+app.router.add_post("/webhook", telegram_webhook)
 
-if __name__ == "__main__":
-    web.run_app(main(), host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+# Устанавливаем webhook при запуске
+async def on_startup(app):
+    webhook_info = await bot.get_webhook_info()
+    if webhook_info.url != WEBHOOK_URL:
+        await bot.set_webhook(WEBHOOK_URL)
+        logging.info(f"Webhook установлен: {WEBHOOK_URL}")
+
+app.on_startup.append(on_startup)
+
+# Запуск сервера
+if __name__ == '__main__':
+    web.run_app(app, host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
