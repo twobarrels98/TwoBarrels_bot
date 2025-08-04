@@ -38,3 +38,7 @@ async def create_app():
 
 if __name__ == "__main__":
     web.run_app(create_app(), port=int(os.environ.get("PORT", 8080)))
+
+@router.message(CommandStart())
+async def command_start_handler(message: Message) -> None:
+    await message.answer("Привет! Я бот для предзаказа шаурмы.")
